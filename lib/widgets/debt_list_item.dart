@@ -1,6 +1,7 @@
-import 'package:debts_app/screens/add_debt_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// ئەو فایلە نوێیەی دروستمان کرد لێرەدا بانگی دەکەین
+import 'package:debts_app/widgets/debt_details_sheet.dart';
 
 class DebtListItem extends StatelessWidget {
   final String docId;
@@ -8,7 +9,6 @@ class DebtListItem extends StatelessWidget {
 
   const DebtListItem({super.key, required this.docId, required this.data});
 
-  // --- فانکشنی پیشاندانی نامەی دڵنیابوونەوە ---
   Future<bool?> _showConfirmDeleteDialog(BuildContext context, String name) {
     return showDialog<bool>(
       context: context,
@@ -17,14 +17,15 @@ class DebtListItem extends StatelessWidget {
         content: Text(
           'ئایا دڵنیای دەتەوێت قەرزی "$name" بە یەکجاری بسڕیتەوە؟',
           textAlign: TextAlign.right,
+          textDirection: TextDirection.rtl,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false), // نەخێر
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('نەخێر', style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true), // بەڵێ
+            onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'بەڵێ، بسڕەوە',
               style: TextStyle(color: Colors.red),
@@ -44,15 +45,11 @@ class DebtListItem extends StatelessWidget {
     return Dismissible(
       key: Key(docId),
       direction: DismissDirection.endToStart,
-
-      // --- ئەم بەشە زیاد کراوە بۆ دڵنیابوونەوە پێش سڕینەوە ---
       confirmDismiss: (direction) async {
         return await _showConfirmDeleteDialog(context, name);
       },
-
       background: Container(
-        alignment: Alignment
-            .centerRight, // گۆڕدرا بۆ ڕاست چونکە ئاڕاستەی سڕینەوە لە دەستەچەپەوەیە
+        alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -110,135 +107,19 @@ class DebtListItem extends StatelessWidget {
             '\$${amount.toStringAsFixed(2)}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          onTap: () => _showDebtDetails(context),
+          onTap: () {
+            // سەیرکە چەند کورت بووەتەوە! تەنها فایلە نوێیەکە بانگ دەکەین
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+              ),
+              builder: (context) => DebtDetailsSheet(docId: docId, data: data),
+            );
+          },
         ),
       ),
-    );
-  }
-
-  void _showDebtDetails(BuildContext context) {
-    // ... هەمان کۆدی پێشووی خۆت لێرەدا دەبێت بەبێ گۆڕانکاری ...
-    final name = data['name'] ?? 'بێناو';
-    final amount = (data['amount'] ?? 0).toDouble();
-    final isOwedToMe = data['isOwedToMe'] ?? true;
-    final timestamp = data['date'] as Timestamp?;
-    final date = timestamp != null ? timestamp.toDate() : DateTime.now();
-    final dateString =
-        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-    final note = data['note'] ?? '';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) {
-        return SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).padding.bottom + 24,
-              left: 24,
-              right: 24,
-              top: 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit_document,
-                        color: Color(0xFF4A90E2),
-                        size: 28,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddDebtScreen(
-                              debtId: docId,
-                              existingData: data,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'بڕی پارە:',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    Text(
-                      '\$${amount.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: isOwedToMe ? Colors.green : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'بەروار:',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    Text(
-                      dateString,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 30),
-                const Text(
-                  'تێبینی:',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  note.isEmpty ? 'هیچ تێبینییەک نەنووسراوە' : note,
-                  style: const TextStyle(fontSize: 16, height: 1.5),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

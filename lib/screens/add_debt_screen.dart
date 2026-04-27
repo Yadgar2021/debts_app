@@ -1,6 +1,8 @@
+import 'package:debts_app/widgets/gradient_background.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/debt_type_toggle.dart'; // ئەمەمان زیاد کردووە
+import '../widgets/debt_type_toggle.dart';
+import '../widgets/custom_text_field.dart'; // فایلە نوێیەکەمان بانگ کرد
 
 class AddDebtScreen extends StatefulWidget {
   final String? debtId;
@@ -20,6 +22,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   bool _isOwedToMe = true;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  String _selectedCurrency = 'USD'; // دەتوانێت ببێتە 'USD' یان 'IQD'
 
   @override
   void initState() {
@@ -29,6 +32,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
       _amountController.text = (widget.existingData!['amount'] ?? 0).toString();
       _noteController.text = widget.existingData!['note'] ?? '';
       _isOwedToMe = widget.existingData!['isOwedToMe'] ?? true;
+      _selectedCurrency = widget.existingData!['currency'] ?? 'USD';
       if (widget.existingData!['date'] != null) {
         _selectedDate = (widget.existingData!['date'] as Timestamp).toDate();
       }
@@ -65,6 +69,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
         final debtData = {
           'name': _nameController.text.trim(),
           'amount': double.parse(_amountController.text.trim()),
+          'currency': _selectedCurrency,
           'isOwedToMe': _isOwedToMe,
           'date': Timestamp.fromDate(_selectedDate),
           'note': _noteController.text.trim(),
@@ -100,116 +105,145 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
     final isEditing = widget.debtId != null;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      // 1. پشتینەی سەرەکی دەکەین بە ترانسپارێنت
+      backgroundColor: Colors.transparent,
+      // 2. ئەمە وادەکات ڕەنگەکە بچێتە ژێر ئاپبارەکەشەوە
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           isEditing ? 'دەستکاریکردنی قەرز' : 'قەرزێکی نوێ',
           style: const TextStyle(color: Colors.black87),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.transparent, // ئاپبارەکەش ترانسپارێنت
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // بەکارهێنانی فایلە نوێیەکە لێرەدا
-                DebtTypeToggle(
-                  isOwedToMe: _isOwedToMe,
-                  onChanged: (value) {
-                    setState(() {
-                      _isOwedToMe = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 24),
+      // 3. لێرەدا کۆنتەینەرەکە و گرادیانتەکەمان زیاد کردووە
+      body: GradientBackground(
+        // کردمان بە وجتێکی سەربەخۆ
+        // decoration: BoxDecoration(
+        //   gradient: LinearGradient(
+        //     begin: Alignment.topLeft,
+        //     end: Alignment.bottomRight,
+        //     colors: [
+        //       Colors.blue.shade50, // ڕەنگی سەرەوەی چەپ (شینێکی زۆر کاڵ)
+        //       Colors.white, // ڕەنگی خوارەوەی ڕاست (سپی)
+        //     ],
+        //   ),
+        // ),
+        // 4. سەیف ئێریا وادەکات کۆدەکان نەچنە ژێر کامێرا و ئاپبارەوە
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DebtTypeToggle(
+                      isOwedToMe: _isOwedToMe,
+                      onChanged: (value) => setState(() => _isOwedToMe = value),
+                    ),
+                    const SizedBox(height: 24),
 
-                TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: 'ناوی کەسەکە',
-                    prefixIcon: const Icon(Icons.person),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
+                    CustomTextField(
+                      controller: _nameController,
+                      labelText: 'ناوی کەسەکە',
+                      prefixIcon: Icons.person,
+                      validator: (value) =>
+                          value!.isEmpty ? 'تکایە ناو بنووسە' : null,
                     ),
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'تکایە ناو بنووسە' : null,
-                ),
-                const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'بڕی پارە',
-                    prefixIcon: const Icon(Icons.attach_money),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
+                    CustomTextField(
+                      controller: _amountController,
+                      labelText: 'بڕی پارە',
+                      prefixIcon: Icons.attach_money,
+                      keyboardType: TextInputType.number,
+                      validator: (value) =>
+                          value!.isEmpty ? 'تکایە بڕی پارە بنووسە' : null,
                     ),
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'تکایە بڕی پارە بنووسە' : null,
-                ),
-                const SizedBox(height: 16),
+                    // // ئەمە ڕێک بخەرە ژێر خانەی بڕی پارەوە
+                    // const SizedBox(height: 16),
+                    // DropdownButtonFormField<String>(
+                    //   value: _selectedCurrency,
+                    //   decoration: InputDecoration(
+                    //     labelText: 'جۆری دراو',
+                    //     prefixIcon: const Icon(Icons.monetization_on),
+                    //     border: OutlineInputBorder(
+                    //       borderRadius: BorderRadius.circular(15),
+                    //     ),
+                    //   ),
+                    //   items: const [
+                    //     DropdownMenuItem(
+                    //       value: 'USD',
+                    //       child: Text('دۆلار (\$)'),
+                    //     ),
+                    //     DropdownMenuItem(
+                    //       value: 'IQD',
+                    //       child: Text('دیناری عێراقی (IQD)'),
+                    //     ),
+                    //   ],
+                    //   onChanged: (String? newValue) {
+                    //     if (newValue != null) {
+                    //       setState(() {
+                    //         _selectedCurrency = newValue;
+                    //       });
+                    //     }
+                    //   },
+                    // ),
+                    const SizedBox(height: 16),
 
-                InkWell(
-                  onTap: () => _selectDate(context),
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'بەروار',
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: Text(
-                      "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                TextFormField(
-                  controller: _noteController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'تێبینی (ئارەزوومەندانە)',
-                    prefixIcon: const Icon(Icons.note),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _saveDebt,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: const Color(0xFF4A90E2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                          isEditing
-                              ? 'هەڵگرتنی گۆڕانکارییەکان'
-                              : 'زیادکردنی قەرز',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'بەروار',
+                          prefixIcon: const Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
                           ),
                         ),
+                        child: Text(
+                          "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    CustomTextField(
+                      controller: _noteController,
+                      labelText: 'تێبینی (ئارەزوومەندانە)',
+                      prefixIcon: Icons.note,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 32),
+
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _saveDebt,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: const Color(0xFF4A90E2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              isEditing
+                                  ? 'هەڵگرتنی گۆڕانکارییەکان'
+                                  : 'زیادکردنی قەرز',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
