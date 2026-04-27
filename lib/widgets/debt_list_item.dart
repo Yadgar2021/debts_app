@@ -8,6 +8,33 @@ class DebtListItem extends StatelessWidget {
 
   const DebtListItem({super.key, required this.docId, required this.data});
 
+  // --- فانکشنی پیشاندانی نامەی دڵنیابوونەوە ---
+  Future<bool?> _showConfirmDeleteDialog(BuildContext context, String name) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('دڵنیای لە سڕینەوە؟', textAlign: TextAlign.right),
+        content: Text(
+          'ئایا دڵنیای دەتەوێت قەرزی "$name" بە یەکجاری بسڕیتەوە؟',
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // نەخێر
+            child: const Text('نەخێر', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), // بەڵێ
+            child: const Text(
+              'بەڵێ، بسڕەوە',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = data['name'] ?? 'بێناو';
@@ -17,8 +44,15 @@ class DebtListItem extends StatelessWidget {
     return Dismissible(
       key: Key(docId),
       direction: DismissDirection.endToStart,
+
+      // --- ئەم بەشە زیاد کراوە بۆ دڵنیابوونەوە پێش سڕینەوە ---
+      confirmDismiss: (direction) async {
+        return await _showConfirmDeleteDialog(context, name);
+      },
+
       background: Container(
-        alignment: Alignment.centerLeft,
+        alignment: Alignment
+            .centerRight, // گۆڕدرا بۆ ڕاست چونکە ئاڕاستەی سڕینەوە لە دەستەچەپەوەیە
         padding: const EdgeInsets.symmetric(horizontal: 20),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -83,6 +117,7 @@ class DebtListItem extends StatelessWidget {
   }
 
   void _showDebtDetails(BuildContext context) {
+    // ... هەمان کۆدی پێشووی خۆت لێرەدا دەبێت بەبێ گۆڕانکاری ...
     final name = data['name'] ?? 'بێناو';
     final amount = (data['amount'] ?? 0).toDouble();
     final isOwedToMe = data['isOwedToMe'] ?? true;
@@ -139,9 +174,7 @@ class DebtListItem extends StatelessWidget {
                         size: 28,
                       ),
                       onPressed: () {
-                        // داخستنی پەنجەرەی خوارەوە (BottomSheet)
                         Navigator.pop(context);
-                        // چوون بۆ پەڕەی دەستکاریکردن و ناردنی زانیارییەکان
                         Navigator.push(
                           context,
                           MaterialPageRoute(

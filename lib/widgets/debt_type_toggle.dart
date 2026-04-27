@@ -30,7 +30,7 @@ class DebtTypeToggle extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'لای خەڵکە',
+                  'لایەتی',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -50,7 +50,7 @@ class DebtTypeToggle extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'لەسەرمە',
+                  'هەیەتی',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
