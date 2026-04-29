@@ -1,20 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/gradient_background.dart';
 
-class PersonAccountScreen extends StatelessWidget {
+class PersonAccountScreen extends StatefulWidget {
   final String personName;
+  final String personPhone;
   final double netBalance;
-  final List<dynamic> transactions; // لیستی هەموو وەسڵەکانی ئەم کەسە
+  final List<dynamic> transactions;
 
   const PersonAccountScreen({
     super.key,
     required this.personName,
+    required this.personPhone,
     required this.netBalance,
     required this.transactions,
   });
 
-  // دیالۆگی دەستکاریکردنی وەسڵ
+  @override
+  State<PersonAccountScreen> createState() => _PersonAccountScreenState();
+}
+
+class _PersonAccountScreenState extends State<PersonAccountScreen> {
+  late String currentPhone;
+
+  @override
+  void initState() {
+    super.initState();
+    currentPhone = widget.personPhone;
+    _checkAndFetchPhone();
+  }
+
+  Future<void> _checkAndFetchPhone() async {
+    if (currentPhone == 'مۆبایل نەنووسراوە' || currentPhone.isEmpty) {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('customers')
+            .where('name', isEqualTo: widget.personName)
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isNotEmpty) {
+          final fetchedPhone = snapshot.docs.first.data()['phone']?.toString();
+          if (fetchedPhone != null && fetchedPhone.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                currentPhone = fetchedPhone;
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('هەڵە لە هێنانی مۆبایل: $e');
+      }
+    }
+  }
+
+  Future<void> _makePhoneCall(BuildContext context, String phoneNumber) async {
+    if (phoneNumber.isEmpty || phoneNumber == 'مۆبایل نەنووسراوە') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ژمارە مۆبایل بەردەست نییە')),
+      );
+      return;
+    }
+
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        throw 'کێشە لە پەیوەندیکردندا هەیە';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('نەتوانرا پەیوەندی بکرێت')),
+        );
+      }
+    }
+  }
+
   Future<void> _showEditTransactionDialog(
     BuildContext context,
     QueryDocumentSnapshot doc,
@@ -49,10 +114,12 @@ class PersonAccountScreen extends StatelessWidget {
                     prefixIcon: Icon(Icons.attach_money),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'تکایە بڕی قەرز بنووسە';
-                    if (double.tryParse(value) == null)
+                    }
+                    if (double.tryParse(value) == null) {
                       return 'تکایە ژمارەی دروست بنووسە';
+                    }
                     return null;
                   },
                 ),
@@ -88,10 +155,8 @@ class PersonAccountScreen extends StatelessWidget {
                       .update({'amount': newAmount, 'note': newNote});
 
                   if (context.mounted) {
-                    Navigator.pop(context); // داخستنی دیالۆگەکە
-                    Navigator.pop(
-                      context,
-                    ); // گەڕانەوە بۆ پەڕەی پێشوو بۆ تازەبوونەوەی داتاکان
+                    Navigator.pop(context);
+                    Navigator.pop(context);
                   }
                 }
               },
@@ -106,10 +171,12 @@ class PersonAccountScreen extends StatelessWidget {
           ],
         );
       },
-    );
+    ).then((_) {
+      amountController.dispose();
+      noteController.dispose();
+    });
   }
 
-  // دیالۆگی دڵنیابوونەوە لە سڕینەوە
   Future<void> _showDeleteDialog(BuildContext context, String docId) async {
     await showDialog(
       context: context,
@@ -142,8 +209,8 @@ class PersonAccountScreen extends StatelessWidget {
                     .doc(docId)
                     .delete();
                 if (context.mounted) {
-                  Navigator.pop(context); // داخستنی دیالۆگەکە
-                  Navigator.pop(context); // گەڕانەوە بۆ پەڕەی پێشوو
+                  Navigator.pop(context);
+                  Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -160,17 +227,77 @@ class PersonAccountScreen extends StatelessWidget {
     );
   }
 
+  // 👈 ئەمە فەنکشنە نوێیەکەیە بۆ پاکتاوکردن و ئەرشیفکردنی مامەڵەکان
+  Future<void> _showArchiveDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            'پاکتاوکردنی حساب',
+            textAlign: TextAlign.right,
+            style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'ئایا دڵنیایت دەتەوێت حسابی ئەم کەسە پاکتاو بکەیت؟\nئەمە هەموو وەسڵەکانی پێشوو ئەرشیف دەکات، و حسابەکەی پاک دەبێتەوە.',
+            textAlign: TextAlign.right,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('نەخێر', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // بەکارهێنانی Batch بۆ ئەوەی هەموو وەسڵەکان بە یەکجاری و خێرا ئەپدەیت بن
+                final batch = FirebaseFirestore.instance.batch();
+                for (var doc in widget.transactions) {
+                  final docRef = FirebaseFirestore.instance
+                      .collection('debts')
+                      .doc(doc.id);
+                  // فیلدی ئەرشیف دەکەین بە ڕاست
+                  batch.update(docRef, {'isArchived': true});
+                }
+
+                await batch.commit();
+
+                if (context.mounted) {
+                  Navigator.pop(context); // داخستنی دیالۆگەکە
+                  Navigator.pop(context); // گەڕانەوە بۆ پەڕەی سەرەکی
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('حسابی کەسەکە بە سەرکەوتوویی پاکتاو کرا'),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+              child: const Text(
+                'بەڵێ، پاکتاوی بکە',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isOwedToMe = netBalance >= 0;
-    final displayBalance = netBalance.abs();
+    final isOwedToMe = widget.netBalance >= 0;
+    final displayBalance = widget.netBalance.abs();
 
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(
-            'کەشف حسابی: $personName',
+            'کەشف حسابی: ${widget.personName}',
             textDirection: TextDirection.rtl,
           ),
           centerTitle: true,
@@ -179,7 +306,6 @@ class PersonAccountScreen extends StatelessWidget {
         ),
         body: Column(
           children: [
-            // کارتی پوختەی حسابی کەسەکە
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Card(
@@ -213,6 +339,78 @@ class PersonAccountScreen extends StatelessWidget {
                           color: isOwedToMe ? Colors.green : Colors.red,
                         ),
                       ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10.0),
+                        child: Divider(),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: const Color(
+                              0xFF4A90E2,
+                            ).withOpacity(0.1),
+                            radius: 25,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.phone,
+                                color: Color(0xFF4A90E2),
+                              ),
+                              onPressed: () =>
+                                  _makePhoneCall(context, currentPhone),
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'ژمارە مۆبایل',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                currentPhone.isNotEmpty
+                                    ? currentPhone
+                                    : 'مۆبایل نەنووسراوە',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textDirection: TextDirection.ltr,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // 👈 دوگمەی پاکتاوکردن لێرەدا زیاد کراوە
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10.0),
+                        child: Divider(),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showArchiveDialog(context),
+                          icon: const Icon(Icons.archive, color: Colors.white),
+                          label: const Text(
+                            'پاکتاوکردنی حساب',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -231,13 +429,13 @@ class PersonAccountScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // لیستی وەسڵەکانی ئەم کەسە
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: transactions.length,
+                itemCount: widget.transactions.length,
                 itemBuilder: (context, index) {
-                  final doc = transactions[index] as QueryDocumentSnapshot;
+                  final doc =
+                      widget.transactions[index] as QueryDocumentSnapshot;
                   final data = doc.data() as Map<String, dynamic>;
                   final amount = (data['amount'] ?? 0).toDouble();
                   final isTransactionOwedToMe = data['isOwedToMe'] ?? true;
@@ -276,7 +474,6 @@ class PersonAccountScreen extends StatelessWidget {
                       ),
                       subtitle: Text('$dateStr\nتێبینی: $note'),
                       isThreeLine: true,
-                      // لێرەدا کۆدەکە گۆڕدراوە بۆ ئەوەی دوگمەی دەستکاری و سڕینەوەی هەبێت
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -42,6 +42,10 @@ class DebtListItem extends StatelessWidget {
     final amount = (data['amount'] ?? 0).toDouble();
     final isOwedToMe = data['isOwedToMe'] ?? true;
 
+    // 👈 هێنانەوەی جۆری دراوەکە لە داتابەیس
+    final currency = data['currency'] ?? 'USD';
+    final currencySymbol = currency == 'USD' ? '\$' : currency;
+
     return Dismissible(
       key: Key(docId),
       direction: DismissDirection.endToStart,
@@ -108,11 +112,11 @@ class DebtListItem extends StatelessWidget {
               ),
             ),
             trailing: Text(
-              '\$${amount.toStringAsFixed(2)}',
+              // 👈 لێرەدا هێمای دراوە ڕاستەقینەکە بەکاردەهێنین
+              '$currencySymbol${amount.toStringAsFixed(2)}',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             onTap: () {
-              // سەیرکە چەند کورت بووەتەوە! تەنها فایلە نوێیەکە بانگ دەکەین
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,

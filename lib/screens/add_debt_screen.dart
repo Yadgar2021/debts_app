@@ -24,13 +24,12 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   bool _isLoading = false;
   String _selectedCurrency = 'USD';
 
-  // لیستی ناوەکان بۆ ئۆتۆکۆمپلێت
   List<String> _existingNames = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchExistingNames(); // هێنانەوەی ناوەکان لەکاتی کردنەوەی پەڕەکە
+    _fetchExistingNames();
 
     if (widget.existingData != null) {
       _nameController.text = widget.existingData!['name'] ?? '';
@@ -46,7 +45,6 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
 
   Future<void> _fetchExistingNames() async {
     try {
-      // تەنها ناوەکان لە لیستی حسابە دروستکراوەکان (customers) دەهێنێت
       final snapshot = await FirebaseFirestore.instance
           .collection('customers')
           .get();
@@ -91,17 +89,26 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
 
   Future<void> _saveDebt() async {
     if (_formKey.currentState!.validate()) {
+      final amountValue = double.tryParse(_amountController.text.trim());
+      if (amountValue == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تکایە بڕی پارەکە بە دروستی بنووسە')),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
 
       try {
         final debtData = {
-          // لێرەدا کێشەکەی پێشووم چارەسەر کرد کە کۆدەکەی دەوەستاند
           'name': _nameController.text.trim(),
-          'amount': double.parse(_amountController.text.trim()),
+          'amount': amountValue,
           'currency': _selectedCurrency,
           'isOwedToMe': _isOwedToMe,
           'date': Timestamp.fromDate(_selectedDate),
           'note': _noteController.text.trim(),
+          'isArchived':
+              false, // 👈 ئەمە زیاد کرا بۆ ئەوەی لە سەرەتادا قەرزەکە ئەرشیف نەکراو بێت
         };
 
         if (widget.debtId == null) {
@@ -118,9 +125,11 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
           Navigator.pop(context);
         }
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('کێشەیەک ڕوویدا: $e')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('کێشەیەک ڕوویدا: $e')));
+        }
       } finally {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -133,20 +142,20 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   Widget build(BuildContext context) {
     final isEditing = widget.debtId != null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(
-          isEditing ? 'دەستکاریکردنی قەرز' : 'قەرزێکی نوێ',
-          style: const TextStyle(color: Colors.black87),
-        ),
+    return GradientBackground(
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-      ),
-      body: GradientBackground(
-        child: SafeArea(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          title: Text(
+            isEditing ? 'دەستکاریکردنی قەرز' : 'قەرزێکی نوێ',
+            style: const TextStyle(color: Colors.black87),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.black87),
+        ),
+        body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
@@ -161,17 +170,15 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // خانەی ناوەکە بە شێوازی گەڕان و هەڵبژاردن
                     Autocomplete<String>(
                       initialValue: TextEditingValue(
                         text: _nameController.text,
                       ),
                       optionsBuilder: (TextEditingValue textEditingValue) {
-                        // ئەگەر خانەکە بەتاڵ بوو، هەموو ناوەکان نیشان بدە
+                        _nameController.text = textEditingValue.text;
                         if (textEditingValue.text.isEmpty) {
                           return _existingNames;
                         }
-                        // ئەگەر دەستی بە نووسین کرد، ناوەکان فلتەر بکە
                         return _existingNames.where((String option) {
                           return option.toLowerCase().contains(
                             textEditingValue.text.toLowerCase(),
@@ -188,11 +195,6 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                             focusNode,
                             onFieldSubmitted,
                           ) {
-                            // بەستنەوەی نووسینەکە بە کۆنتڕۆڵەرە سەرەکییەکەوە
-                            textEditingController.addListener(() {
-                              _nameController.text = textEditingController.text;
-                            });
-
                             return TextFormField(
                               controller: textEditingController,
                               focusNode: focusNode,
@@ -207,10 +209,10 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
+                                if (value == null || value.trim().isEmpty) {
                                   return 'تکایە ناوێک بنووسە یان هەڵبژێرە';
                                 }
-                                if (!_existingNames.contains(value)) {
+                                if (!_existingNames.contains(value.trim())) {
                                   return 'ئەم کەسە حسابی نییە، سەرەتا حسابی بۆ بکەوە';
                                 }
                                 return null;
@@ -238,9 +240,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                                   );
                                   return ListTile(
                                     title: Text(option),
-                                    onTap: () {
-                                      onSelected(option);
-                                    },
+                                    onTap: () => onSelected(option),
                                   );
                                 },
                               ),
@@ -255,9 +255,18 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                       controller: _amountController,
                       labelText: 'بڕی پارە',
                       prefixIcon: Icons.attach_money,
-                      keyboardType: TextInputType.number,
-                      validator: (value) =>
-                          value!.isEmpty ? 'تکایە بڕی پارە بنووسە' : null,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'تکایە بڕی پارە بنووسە';
+                        }
+                        if (double.tryParse(value.trim()) == null) {
+                          return 'تکایە تەنها ژمارە بەکاربهێنە';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 

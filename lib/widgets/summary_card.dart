@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class SummaryCard extends StatelessWidget {
   final double totalOwedToMe;
   final double totalIOwe;
+  // 👈 ئەم گۆڕاوەمان زیاد کرد بۆ هێمای دراوەکە
+  final String currencySymbol;
 
   const SummaryCard({
     super.key,
     required this.totalOwedToMe,
     required this.totalIOwe,
+    // 👈 دۆلارمان وەک بنچینە (Default) داناوە ئەگەر هیچی بۆ نەنێردرا
+    this.currencySymbol = '\$',
   });
 
   @override
@@ -30,7 +34,8 @@ class SummaryCard extends StatelessWidget {
           Expanded(
             child: _buildSummaryItem(
               title: 'لای خەڵکە',
-              amount: '\$${totalOwedToMe.toStringAsFixed(2)}',
+              // 👈 لێرەدا هێمای دراوە گۆڕاوەکەمان بەکارهێنا لەبری دۆلاری جێگیر
+              amount: '$currencySymbol${totalOwedToMe.toStringAsFixed(2)}',
               color: Colors.green.shade700,
               icon: Icons.arrow_upward_rounded,
             ),
@@ -44,7 +49,8 @@ class SummaryCard extends StatelessWidget {
           Expanded(
             child: _buildSummaryItem(
               title: 'لەسەرمە',
-              amount: '\$${totalIOwe.toStringAsFixed(2)}',
+              // 👈 لێرەشدا بە هەمان شێوە
+              amount: '$currencySymbol${totalIOwe.toStringAsFixed(2)}',
               color: Colors.red.shade600,
               icon: Icons.arrow_downward_rounded,
             ),

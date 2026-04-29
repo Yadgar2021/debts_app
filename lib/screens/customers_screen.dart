@@ -35,7 +35,7 @@ class CustomersScreen extends StatelessWidget {
                   labelText: 'ناوی سیانی',
                   prefixIcon: Icons.person,
                   validator: (value) =>
-                      value!.isEmpty ? 'تکایە ناو بنووسە' : null,
+                      value!.trim().isEmpty ? 'تکایە ناو بنووسە' : null,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -150,7 +150,11 @@ class CustomersScreen extends StatelessWidget {
           ],
         );
       },
-    );
+    ).then((_) {
+      // 👈 زیادکردنی ئەمە زۆر گرنگە بۆ ڕێگریکردن لە کێشەی میمۆری
+      nameController.dispose();
+      phoneController.dispose();
+    });
   }
 
   // دیالۆگێک بۆ دڵنیابوونەوە لە سڕینەوەی حساب
@@ -256,8 +260,10 @@ class CustomersScreen extends StatelessWidget {
                   final doc = customers[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final name = data['name'] ?? 'بێناو';
-                  final phone = data['phone'] ?? 'مۆبایل نەنووسراوە';
-
+                  final rawPhone = data['phone']?.toString().trim() ?? '';
+                  final phone = rawPhone.isEmpty
+                      ? 'مۆبایل نەنووسراوە'
+                      : rawPhone;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(
@@ -282,7 +288,7 @@ class CustomersScreen extends StatelessWidget {
                               color: Color(0xFF4A90E2),
                             ),
                             onPressed: () {
-                              _showEditDialog(context, doc.id, name, phone);
+                              _showEditDialog(context, doc.id, name, rawPhone);
                             },
                           ),
                           IconButton(

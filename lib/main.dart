@@ -24,7 +24,9 @@ class MyApp extends StatelessWidget {
       title: 'بەڕێوەبردنی قەرزەکان',
       theme: ThemeData(
         scaffoldBackgroundColor: const Color.fromARGB(255, 66, 123, 238),
-        primarySwatch: Colors.blueGrey,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blueGrey,
+        ), // ئەم دێڕە گۆڕدرا
         useMaterial3: true,
       ),
       // لێرەدا ڕاستەوخۆ دیزاینە نوێیەکە بانگ دەکەین

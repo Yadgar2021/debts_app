@@ -24,16 +24,20 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      validator: validator,
       decoration: InputDecoration(
         labelText: labelText,
-        prefixIcon: Icon(prefixIcon),
+        // 👈 ڕەنگێکمان دا بە ئایکۆنەکە بۆ ئەوەی لەگەڵ دوگمەکانی ترت بگونجێت
+        prefixIcon: Icon(prefixIcon, color: const Color(0xFF4A90E2)),
+        // 👈 ئەم دوو دێڕە وا دەکات بۆکسەکە ڕەنگی سپی بێت، بۆ سەر باکگراوندی ڕەنگاوڕەنگ زۆر جوانە
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.9),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            15,
-          ), // لێرەدا تەنها یەکجار دیزاینەکە دەکەین
+          borderRadius: BorderRadius.circular(15),
+          // 👈 بۆ ئەوەی هێڵی دەوروبەری بۆکسەکە زۆر تۆخ نەبێت
+          borderSide: BorderSide.none,
         ),
       ),
-      validator: validator,
     );
   }
 }

@@ -19,6 +19,10 @@ class DebtDetailsSheet extends StatelessWidget {
         "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
     final note = data['note'] ?? '';
 
+    // 👈 لێرەدا دراوەکە لە داتابەیس دەهێنین، ئەگەر نەبوو دەیکەین بە دۆلار
+    final currency = data['currency'] ?? 'USD';
+    final currencySymbol = currency == 'USD' ? '\$' : currency;
+
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(
@@ -31,6 +35,7 @@ class DebtDetailsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // هێڵە خۆلەمێشییەکەی سەرەوەی بۆتۆم شیتەکە
             Center(
               child: Container(
                 width: 40,
@@ -81,7 +86,8 @@ class DebtDetailsSheet extends StatelessWidget {
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 Text(
-                  '\$${amount.toStringAsFixed(2)}',
+                  // 👈 لێرەدا هێمای دراوە دروستەکە نیشان دەدەین لەبری دۆلاری جێگیر
+                  '$currencySymbol${amount.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,

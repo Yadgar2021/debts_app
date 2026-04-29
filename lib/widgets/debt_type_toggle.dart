@@ -15,7 +15,8 @@ class DebtTypeToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        // 👈 ڕەنگەکەمان کرد بە سپییەکی شەفاف بۆ ئەوەی لەسەر باکگراوندە ڕەنگاوڕەنگەکە جوانتر بێت
+        color: Colors.white.withOpacity(0.6),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -23,7 +24,9 @@ class DebtTypeToggle extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               onTap: () => onChanged(true), // گۆڕینی دۆخەکە بۆ "لای خەڵکە"
-              child: Container(
+              // 👈 گۆڕیمان بۆ AnimatedContainer بۆ ئەوەی جوڵەکەی نەرم بێت
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: isOwedToMe ? Colors.green : Colors.transparent,
@@ -34,7 +37,7 @@ class DebtTypeToggle extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isOwedToMe ? Colors.white : Colors.grey.shade700,
+                    color: isOwedToMe ? Colors.white : Colors.grey.shade800,
                   ),
                 ),
               ),
@@ -43,7 +46,9 @@ class DebtTypeToggle extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               onTap: () => onChanged(false), // گۆڕینی دۆخەکە بۆ "لەسەرمە"
-              child: Container(
+              // 👈 گۆڕیمان بۆ AnimatedContainer بۆ ئەوەی جوڵەکەی نەرم بێت
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: !isOwedToMe ? Colors.red : Colors.transparent,
@@ -54,7 +59,7 @@ class DebtTypeToggle extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: !isOwedToMe ? Colors.white : Colors.grey.shade700,
+                    color: !isOwedToMe ? Colors.white : Colors.grey.shade800,
                   ),
                 ),
               ),

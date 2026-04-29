@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_debt_screen.dart';
 import '../widgets/summary_card.dart';
-// تێبینی: دڵنیابە لەوەی ئەم فایلە نوێیەت دروستکردووە کە پێشتر باسمان کرد
 import 'person_account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -25,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _debtsStream = FirebaseFirestore.instance
         .collection('debts')
+        .where('isArchived', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
@@ -33,6 +33,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // مێنیوی دوگمەی زیادکردن خرایە ئێرە بۆ پاکڕاگرتنی فەنکشنی سەرەکی
+  void _showAddBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF4A90E2),
+                    child: Icon(Icons.person_add, color: Colors.white),
+                  ),
+                  title: const Text(
+                    'کردنەوەی حسابی نوێ',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  subtitle: const Text(
+                    'بۆ زیادکردنی کەسێکی نوێ بە ناو و ژمارە مۆبایل',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddAccountScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(indent: 70, endIndent: 20),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.green,
+                    child: Icon(Icons.post_add, color: Colors.white),
+                  ),
+                  title: const Text(
+                    'زیادکردنی قەرز',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  subtitle: const Text('بۆ تۆمارکردنی وەسڵ یان قەرزێکی نوێ'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddDebtScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -49,7 +114,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.black87,
             ),
           ),
-
           centerTitle: true,
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -62,18 +126,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => CustomersScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const CustomersScreen(),
+                  ),
                 );
               },
             ),
             const SizedBox(width: 8),
-            //   Text("لیستی ناوەکان"),
-            // const SizedBox(width: 8),
           ],
         ),
         body: StreamBuilder<QuerySnapshot>(
           stream: _debtsStream,
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: SelectableText(
+                    'هەڵە هەیە: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
@@ -82,29 +158,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             double totalOwedToMe = 0;
             double totalIOwe = 0;
 
-            // ١. لۆژیکی کۆکردنەوەی قەرزەکان بەپێی ناو (Grouping)
             Map<String, Map<String, dynamic>> groupedPersons = {};
 
             for (var doc in allDebts) {
               final data = doc.data() as Map<String, dynamic>;
               final amount = (data['amount'] ?? 0).toDouble();
               final isOwedToMe = data['isOwedToMe'] ?? true;
-
               final rawName = (data['name'] ?? 'بێناو').toString().trim();
               final nameKey = rawName.toLowerCase();
-
-              if (isOwedToMe) {
-                totalOwedToMe += amount;
-              } else {
-                totalIOwe += amount;
-              }
+              final phone = data['phone'] ?? 'مۆبایل نەنووسراوە';
 
               if (!groupedPersons.containsKey(nameKey)) {
                 groupedPersons[nameKey] = {
                   'displayName': rawName,
+                  'phone': phone,
                   'netBalance': 0.0,
                   'transactions': [],
                 };
+              } else if (phone != 'مۆبایل نەنووسراوە' &&
+                  groupedPersons[nameKey]!['phone'] == 'مۆبایل نەنووسراوە') {
+                groupedPersons[nameKey]!['phone'] = phone;
               }
 
               if (isOwedToMe) {
@@ -116,8 +189,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               groupedPersons[nameKey]!['transactions'].add(doc);
             }
 
-            // فلتەرکردنی ناوە گروپ کراوەکان بەپێی گەڕان
-            final filteredPersons = groupedPersons.values.where((person) {
+            final List<Map<String, dynamic>> activePersons = [];
+
+            for (var person in groupedPersons.values) {
+              final balance = person['netBalance'] as double;
+              if (balance.abs() > 0.001) {
+                activePersons.add(person);
+                if (balance > 0) {
+                  totalOwedToMe += balance;
+                } else {
+                  totalIOwe += balance.abs();
+                }
+              }
+            }
+
+            final filteredPersons = activePersons.where((person) {
               final name = person['displayName'].toString().toLowerCase();
               return name.contains(searchQuery.toLowerCase());
             }).toList();
@@ -132,7 +218,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     totalIOwe: totalIOwe,
                   ),
                   const SizedBox(height: 18),
-
                   TextField(
                     textAlign: TextAlign.end,
                     controller: _searchController,
@@ -159,7 +244,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
                   const Center(
                     child: Text(
                       'لیستی قەرزەکان',
@@ -172,12 +256,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
                   Expanded(
                     child: filteredPersons.isEmpty
                         ? const Center(
                             child: Text(
-                              'هیچ قەرزێکت نیە ',
+                              'هیچ قەرزێکت نیە',
                               style: TextStyle(color: Colors.black54),
                             ),
                           )
@@ -188,7 +271,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               final balance = person['netBalance'] as double;
                               final transactionCount =
                                   (person['transactions'] as List).length;
-
                               final isOwedToMe = balance >= 0;
                               final displayBalance = balance.abs();
 
@@ -199,13 +281,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 child: ListTile(
                                   onTap: () {
-                                    // چوونە ناو پەڕەی کەشف حسابی کەسەکە
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             PersonAccountScreen(
                                               personName: person['displayName'],
+                                              personPhone: person['phone'],
                                               netBalance: balance,
                                               transactions:
                                                   person['transactions'],
@@ -270,81 +352,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            // کردنەوەی پەنجەرەی هەڵبژاردنەکان (Bottom Sheet)
-            showModalBottomSheet(
-              context: context,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-              ),
-              builder: (context) {
-                return SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // هەڵبژاردەی یەکەم: کردنەوەی حسابی نوێ
-                        ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFF4A90E2),
-                            child: Icon(Icons.person_add, color: Colors.white),
-                          ),
-                          title: const Text(
-                            'کردنەوەی حسابی نوێ',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'بۆ زیادکردنی کەسێکی نوێ بە ناو و ژمارە مۆبایل',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context); // داخستنی پەنجەرە بچووکەکە
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AddAccountScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const Divider(indent: 70, endIndent: 20),
-
-                        // هەڵبژاردەی دووەم: زیادکردنی قەرز
-                        ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Colors.green,
-                            child: Icon(Icons.post_add, color: Colors.white),
-                          ),
-                          title: const Text(
-                            'زیادکردنی قەرز',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'بۆ تۆمارکردنی وەسڵ یان قەرزێکی نوێ',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context); // داخستنی پەنجەرە بچووکەکە
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AddDebtScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
+          onPressed: () =>
+              _showAddBottomSheet(context), // 👈 لێرەدا زۆر کورت بووەوە
           backgroundColor: const Color(0xFF4A90E2),
           child: const Icon(Icons.add, color: Colors.white),
         ),

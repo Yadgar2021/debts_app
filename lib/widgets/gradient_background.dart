@@ -8,18 +8,22 @@ class GradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      // 👈 زیادکردنی ئەم دوو دێڕە بۆ ئەوەی هەمیشە هەموو شاشەکە بگرێتەوە
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        // 👈 دانانی const لێرەدا خێرایی ئەپەکە زیاد دەکات
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color.fromARGB(
+            Color.fromARGB(
               255,
               94,
               144,
               180,
             ), // دەتوانیت لێرەدا ڕەنگەکان بگۆڕیت
-            const Color.fromARGB(255, 197, 136, 136),
+            Color.fromARGB(255, 197, 136, 136),
           ],
         ),
       ),
