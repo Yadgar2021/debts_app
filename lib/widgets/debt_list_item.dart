@@ -73,51 +73,57 @@ class DebtListItem extends StatelessWidget {
           );
         }
       },
-      child: Card(
-        elevation: 0,
-        margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        color: Colors.white.withOpacity(0.8),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          leading: CircleAvatar(
-            backgroundColor: isOwedToMe
-                ? Colors.green.shade100
-                : Colors.red.shade100,
-            child: Icon(
-              isOwedToMe ? Icons.arrow_upward : Icons.arrow_downward,
-              color: isOwedToMe ? Colors.green : Colors.red,
+          color: Colors.white.withOpacity(0.8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
             ),
-          ),
-          title: Text(
-            name,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(
-            isOwedToMe ? 'پێم داوە' : 'لێم وەرگرتووە',
-            style: TextStyle(
-              color: isOwedToMe ? Colors.green : Colors.red,
-              fontSize: 12,
-            ),
-          ),
-          trailing: Text(
-            '\$${amount.toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          onTap: () {
-            // سەیرکە چەند کورت بووەتەوە! تەنها فایلە نوێیەکە بانگ دەکەین
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            leading: CircleAvatar(
+              backgroundColor: isOwedToMe
+                  ? Colors.green.shade100
+                  : Colors.red.shade100,
+              child: Icon(
+                isOwedToMe ? Icons.arrow_upward : Icons.arrow_downward,
+                color: isOwedToMe ? Colors.green : Colors.red,
               ),
-              builder: (context) => DebtDetailsSheet(docId: docId, data: data),
-            );
-          },
+            ),
+            title: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              isOwedToMe ? 'پێم داوە' : 'لێم وەرگرتووە',
+              style: TextStyle(
+                color: isOwedToMe ? Colors.green : Colors.red,
+                fontSize: 12,
+              ),
+            ),
+            trailing: Text(
+              '\$${amount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            onTap: () {
+              // سەیرکە چەند کورت بووەتەوە! تەنها فایلە نوێیەکە بانگ دەکەین
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                builder: (context) =>
+                    DebtDetailsSheet(docId: docId, data: data),
+              );
+            },
+          ),
         ),
       ),
     );

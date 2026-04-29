@@ -2,7 +2,7 @@ import 'package:debts_app/widgets/gradient_background.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/debt_type_toggle.dart';
-import '../widgets/custom_text_field.dart'; // فایلە نوێیەکەمان بانگ کرد
+import '../widgets/custom_text_field.dart';
 
 class AddDebtScreen extends StatefulWidget {
   final String? debtId;
@@ -22,11 +22,16 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   bool _isOwedToMe = true;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
-  String _selectedCurrency = 'USD'; // دەتوانێت ببێتە 'USD' یان 'IQD'
+  String _selectedCurrency = 'USD';
+
+  // لیستی ناوەکان بۆ ئۆتۆکۆمپلێت
+  List<String> _existingNames = [];
 
   @override
   void initState() {
     super.initState();
+    _fetchExistingNames(); // هێنانەوەی ناوەکان لەکاتی کردنەوەی پەڕەکە
+
     if (widget.existingData != null) {
       _nameController.text = widget.existingData!['name'] ?? '';
       _amountController.text = (widget.existingData!['amount'] ?? 0).toString();
@@ -36,6 +41,29 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
       if (widget.existingData!['date'] != null) {
         _selectedDate = (widget.existingData!['date'] as Timestamp).toDate();
       }
+    }
+  }
+
+  Future<void> _fetchExistingNames() async {
+    try {
+      // تەنها ناوەکان لە لیستی حسابە دروستکراوەکان (customers) دەهێنێت
+      final snapshot = await FirebaseFirestore.instance
+          .collection('customers')
+          .get();
+      final Set<String> names = {};
+      for (var doc in snapshot.docs) {
+        final name = (doc.data()['name'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          names.add(name);
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _existingNames = names.toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('هەڵە لە هێنانەوەی ناوەکان: $e');
     }
   }
 
@@ -67,6 +95,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
 
       try {
         final debtData = {
+          // لێرەدا کێشەکەی پێشووم چارەسەر کرد کە کۆدەکەی دەوەستاند
           'name': _nameController.text.trim(),
           'amount': double.parse(_amountController.text.trim()),
           'currency': _selectedCurrency,
@@ -105,33 +134,18 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
     final isEditing = widget.debtId != null;
 
     return Scaffold(
-      // 1. پشتینەی سەرەکی دەکەین بە ترانسپارێنت
       backgroundColor: Colors.transparent,
-      // 2. ئەمە وادەکات ڕەنگەکە بچێتە ژێر ئاپبارەکەشەوە
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           isEditing ? 'دەستکاریکردنی قەرز' : 'قەرزێکی نوێ',
           style: const TextStyle(color: Colors.black87),
         ),
-        backgroundColor: Colors.transparent, // ئاپبارەکەش ترانسپارێنت
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
-      // 3. لێرەدا کۆنتەینەرەکە و گرادیانتەکەمان زیاد کردووە
       body: GradientBackground(
-        // کردمان بە وجتێکی سەربەخۆ
-        // decoration: BoxDecoration(
-        //   gradient: LinearGradient(
-        //     begin: Alignment.topLeft,
-        //     end: Alignment.bottomRight,
-        //     colors: [
-        //       Colors.blue.shade50, // ڕەنگی سەرەوەی چەپ (شینێکی زۆر کاڵ)
-        //       Colors.white, // ڕەنگی خوارەوەی ڕاست (سپی)
-        //     ],
-        //   ),
-        // ),
-        // 4. سەیف ئێریا وادەکات کۆدەکان نەچنە ژێر کامێرا و ئاپبارەوە
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
@@ -147,12 +161,93 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    CustomTextField(
-                      controller: _nameController,
-                      labelText: 'ناوی کەسەکە',
-                      prefixIcon: Icons.person,
-                      validator: (value) =>
-                          value!.isEmpty ? 'تکایە ناو بنووسە' : null,
+                    // خانەی ناوەکە بە شێوازی گەڕان و هەڵبژاردن
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(
+                        text: _nameController.text,
+                      ),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        // ئەگەر خانەکە بەتاڵ بوو، هەموو ناوەکان نیشان بدە
+                        if (textEditingValue.text.isEmpty) {
+                          return _existingNames;
+                        }
+                        // ئەگەر دەستی بە نووسین کرد، ناوەکان فلتەر بکە
+                        return _existingNames.where((String option) {
+                          return option.toLowerCase().contains(
+                            textEditingValue.text.toLowerCase(),
+                          );
+                        });
+                      },
+                      onSelected: (String selection) {
+                        _nameController.text = selection;
+                      },
+                      fieldViewBuilder:
+                          (
+                            context,
+                            textEditingController,
+                            focusNode,
+                            onFieldSubmitted,
+                          ) {
+                            // بەستنەوەی نووسینەکە بە کۆنتڕۆڵەرە سەرەکییەکەوە
+                            textEditingController.addListener(() {
+                              _nameController.text = textEditingController.text;
+                            });
+
+                            return TextFormField(
+                              controller: textEditingController,
+                              focusNode: focusNode,
+                              decoration: InputDecoration(
+                                labelText: 'ناوی کەسەکە',
+                                prefixIcon: const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF4A90E2),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'تکایە ناوێک بنووسە یان هەڵبژێرە';
+                                }
+                                if (!_existingNames.contains(value)) {
+                                  return 'ئەم کەسە حسابی نییە، سەرەتا حسابی بۆ بکەوە';
+                                }
+                                return null;
+                              },
+                            );
+                          },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            elevation: 4.0,
+                            borderRadius: BorderRadius.circular(15),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxHeight: 200,
+                                maxWidth: 300,
+                              ),
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  final String option = options.elementAt(
+                                    index,
+                                  );
+                                  return ListTile(
+                                    title: Text(option),
+                                    onTap: () {
+                                      onSelected(option);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -164,35 +259,6 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                       validator: (value) =>
                           value!.isEmpty ? 'تکایە بڕی پارە بنووسە' : null,
                     ),
-                    // // ئەمە ڕێک بخەرە ژێر خانەی بڕی پارەوە
-                    // const SizedBox(height: 16),
-                    // DropdownButtonFormField<String>(
-                    //   value: _selectedCurrency,
-                    //   decoration: InputDecoration(
-                    //     labelText: 'جۆری دراو',
-                    //     prefixIcon: const Icon(Icons.monetization_on),
-                    //     border: OutlineInputBorder(
-                    //       borderRadius: BorderRadius.circular(15),
-                    //     ),
-                    //   ),
-                    //   items: const [
-                    //     DropdownMenuItem(
-                    //       value: 'USD',
-                    //       child: Text('دۆلار (\$)'),
-                    //     ),
-                    //     DropdownMenuItem(
-                    //       value: 'IQD',
-                    //       child: Text('دیناری عێراقی (IQD)'),
-                    //     ),
-                    //   ],
-                    //   onChanged: (String? newValue) {
-                    //     if (newValue != null) {
-                    //       setState(() {
-                    //         _selectedCurrency = newValue;
-                    //       });
-                    //     }
-                    //   },
-                    // ),
                     const SizedBox(height: 16),
 
                     InkWell(
