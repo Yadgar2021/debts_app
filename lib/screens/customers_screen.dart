@@ -2,9 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/custom_search_bar.dart'; // 👈 لێرەدا فایلە نوێیەکەمان هێناوەتە ژوورەوە
 
-class CustomersScreen extends StatelessWidget {
+// 👈 تێبینی: دڵنیابە لەوەی پاتی ئەم فایلە ڕاستە بۆ ئەوەی پەڕەی کەشف حساب بناسێتەوە
+import 'person_account_screen.dart';
+
+class CustomersScreen extends StatefulWidget {
   const CustomersScreen({super.key});
+
+  @override
+  State<CustomersScreen> createState() => _CustomersScreenState();
+}
+
+class _CustomersScreenState extends State<CustomersScreen> {
+  // 👈 گۆڕاوێک بۆ هەڵگرتنی ئەو وشەیەی بۆی دەگەڕێین
+  String searchQuery = '';
 
   // دیالۆگێک بۆ دەستکاریکردنی زانیارییەکان
   Future<void> _showEditDialog(
@@ -61,7 +73,6 @@ class CustomersScreen extends StatelessWidget {
                   final newName = nameController.text.trim();
                   final newPhone = phoneController.text.trim();
 
-                  // نیشاندانی لۆدینگ (چاوەڕێکردن) بۆ ئەوەی بەکارهێنەر بزانێت کارێک دەکرێت
                   showDialog(
                     context: context,
                     barrierDismissible: false,
@@ -70,7 +81,6 @@ class CustomersScreen extends StatelessWidget {
                   );
 
                   try {
-                    // پشکنین: ئایا ناوەکە گۆڕاوە و بووەتە ناوێک کە پێشتر هەیە؟
                     if (newName != currentName) {
                       final checkSnapshot = await FirebaseFirestore.instance
                           .collection('customers')
@@ -79,7 +89,6 @@ class CustomersScreen extends StatelessWidget {
 
                       bool isDuplicate = false;
                       for (var doc in checkSnapshot.docs) {
-                        // ئەگەر ناوەکە هەبوو وە ئایدییەکەی جیاواز بوو لەم کەسە، واتە هی کەسێکی ترە
                         if (doc.id != docId) {
                           isDuplicate = true;
                           break;
@@ -87,11 +96,8 @@ class CustomersScreen extends StatelessWidget {
                       }
 
                       if (isDuplicate) {
-                        // ١. لابردنی لۆدینگەکە
-                        if (context.mounted) Navigator.pop(context);
-
-                        // ٢. نیشاندانی ئاگادارکەرەوە
-                        if (context.mounted) {
+                        if (mounted) Navigator.pop(context);
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -101,40 +107,32 @@ class CustomersScreen extends StatelessWidget {
                             ),
                           );
                         }
-                        return; // وەستاندنی پرۆسەی خەزنکردن
+                        return;
                       }
                     }
 
-                    // ئەگەر ناوەکە کێشەی نەبوو یان تەنها ژمارە مۆبایلەکەی گۆڕیبوو:
-                    // ١. ئەپدەیتکردنی حسابەکە لە کۆلێکشنی customers
                     await FirebaseFirestore.instance
                         .collection('customers')
                         .doc(docId)
                         .update({'name': newName, 'phone': newPhone});
 
-                    // ٢. ئەگەر ناوەکە گۆڕابوو، ئەوا لەناو قەرزەکانیش بیگۆڕە
                     if (newName != currentName) {
-                      // هێنانەوەی هەموو ئەو قەرزانەی کە بە ناوە کۆنەکەوەن
                       final debtsSnapshot = await FirebaseFirestore.instance
                           .collection('debts')
                           .where('name', isEqualTo: currentName)
                           .get();
 
-                      // بەکارهێنانی Batch بۆ ئەوەی هەموو قەرزەکان بەیەکەوە و بە خێرایی ئەپدەیت بکات
                       final batch = FirebaseFirestore.instance.batch();
                       for (var doc in debtsSnapshot.docs) {
                         batch.update(doc.reference, {'name': newName});
                       }
-                      await batch.commit(); // جێبەجێکردنی هەموو گۆڕانکارییەکان
+                      await batch.commit();
                     }
 
-                    // لابردنی لۆدینگەکە
-                    if (context.mounted) Navigator.pop(context);
-                    // داخستنی دیالۆگی دەستکاریکردنەکە
-                    if (context.mounted) Navigator.pop(context);
+                    if (mounted) Navigator.pop(context);
+                    if (mounted) Navigator.pop(context);
                   } catch (e) {
-                    // لابردنی لۆدینگەکە ئەگەر هەڵەیەک ڕوویدا
-                    if (context.mounted) Navigator.pop(context);
+                    if (mounted) Navigator.pop(context);
                     debugPrint('هەڵە لە ئەپدەیتکردن: $e');
                   }
                 }
@@ -151,7 +149,6 @@ class CustomersScreen extends StatelessWidget {
         );
       },
     ).then((_) {
-      // 👈 زیادکردنی ئەمە زۆر گرنگە بۆ ڕێگریکردن لە کێشەی میمۆری
       nameController.dispose();
       phoneController.dispose();
     });
@@ -193,13 +190,12 @@ class CustomersScreen extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () async {
-                // سڕینەوەی دۆکیومێنتەکە لە فایەربەیس
                 await FirebaseFirestore.instance
                     .collection('customers')
                     .doc(docId)
                     .delete();
-                if (context.mounted) {
-                  Navigator.pop(context); // داخستنی دیالۆگەکە
+                if (mounted) {
+                  Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -223,7 +219,7 @@ class CustomersScreen extends StatelessWidget {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text(
-          'لیستی ناوەکان',
+          'لیستی کڕیارەکان',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -233,80 +229,186 @@ class CustomersScreen extends StatelessWidget {
       ),
       body: GradientBackground(
         child: SafeArea(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('customers')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'هیچ حسابێک بوونی نییە',
-                    style: TextStyle(color: Colors.black54, fontSize: 18),
-                  ),
-                );
-              }
-
-              final customers = snapshot.data!.docs;
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: customers.length,
-                itemBuilder: (context, index) {
-                  final doc = customers[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final name = data['name'] ?? 'بێناو';
-                  final rawPhone = data['phone']?.toString().trim() ?? '';
-                  final phone = rawPhone.isEmpty
-                      ? 'مۆبایل نەنووسراوە'
-                      : rawPhone;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFF4A90E2),
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      title: Text(
-                        name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(phone),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit,
-                              color: Color(0xFF4A90E2),
-                            ),
-                            onPressed: () {
-                              _showEditDialog(context, doc.id, name, rawPhone);
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                            ),
-                            onPressed: () {
-                              _showDeleteDialog(context, doc.id, name);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+          child: Column(
+            children: [
+              // 👈 بەکارهێنانی ویدجێتی گەڕانە نوێیەکەمان
+              CustomSearchBar(
+                hintText: 'گەڕان بۆ ناو...',
+                onChanged: (value) {
+                  setState(() {
+                    searchQuery = value.toLowerCase();
+                  });
                 },
-              );
-            },
+              ),
+
+              // بەشی پیشاندانی لیستەکە
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('customers')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'هیچ حسابێک بوونی نییە',
+                          style: TextStyle(color: Colors.black54, fontSize: 18),
+                        ),
+                      );
+                    }
+
+                    // 👈 فلتەرکردنی ناوەکان بەپێی گەڕانەکە
+                    final allCustomers = snapshot.data!.docs;
+                    final filteredCustomers = allCustomers.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final name = (data['name'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      return name.contains(searchQuery);
+                    }).toList();
+
+                    if (filteredCustomers.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'ئەو ناوە نەدۆزرایەوە',
+                          style: TextStyle(color: Colors.black54, fontSize: 16),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredCustomers.length,
+                      itemBuilder: (context, index) {
+                        final doc = filteredCustomers[index];
+                        final data = doc.data() as Map<String, dynamic>;
+                        final name = data['name'] ?? 'بێناو';
+                        final rawPhone = data['phone']?.toString().trim() ?? '';
+                        final phone = rawPhone.isEmpty
+                            ? 'مۆبایل نەنووسراوە'
+                            : rawPhone;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(15),
+                            // 👈 کاتێک کلیک لە ناوێک دەکەیت دەتباتە پەڕەی کەشف حساب
+                            onTap: () async {
+                              // ١. نیشاندانی ئایکۆنی لۆدینگ بۆ چرکەیەک تا داتاکان دەهێنێت
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+
+                              try {
+                                // ٢. هێنانەوەی هەموو وەسڵە ئەرشیف نەکراوەکانی ئەم کەسە
+                                final debtsSnapshot = await FirebaseFirestore
+                                    .instance
+                                    .collection('debts')
+                                    .where('name', isEqualTo: name)
+                                    .where('isArchived', isEqualTo: false)
+                                    .get();
+
+                                double totalBalance = 0;
+                                final transactions = debtsSnapshot.docs;
+
+                                // ٣. کۆکردنەوەی بڕی قەرزەکان (باڵانس)
+                                for (var doc in transactions) {
+                                  final debtData =
+                                      doc.data() as Map<String, dynamic>;
+                                  final amount = (debtData['amount'] ?? 0)
+                                      .toDouble();
+                                  final isOwedToMe =
+                                      debtData['isOwedToMe'] ?? true;
+
+                                  if (isOwedToMe) {
+                                    totalBalance += amount;
+                                  } else {
+                                    totalBalance -= amount;
+                                  }
+                                }
+
+                                // ٤. لابردنی ئایکۆنی لۆدینگەکە
+                                if (context.mounted) Navigator.pop(context);
+
+                                // ٥. چوونە ناو پەڕەی کەشف حساب بە داتا ڕاستەقینەکانەوە
+                                if (context.mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PersonAccountScreen(
+                                        personName: name,
+                                        personPhone: phone,
+                                        netBalance: totalBalance,
+                                        transactions: transactions,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) Navigator.pop(context);
+                                debugPrint('هەڵە لە هێنانی داتای قەرزەکان: $e');
+                              }
+                            },
+                            child: ListTile(
+                              leading: const CircleAvatar(
+                                backgroundColor: Color(0xFF4A90E2),
+                                child: Icon(Icons.person, color: Colors.white),
+                              ),
+                              title: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(phone),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Color(0xFF4A90E2),
+                                    ),
+                                    onPressed: () {
+                                      _showEditDialog(
+                                        context,
+                                        doc.id,
+                                        name,
+                                        rawPhone,
+                                      );
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.redAccent,
+                                    ),
+                                    onPressed: () {
+                                      _showDeleteDialog(context, doc.id, name);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
