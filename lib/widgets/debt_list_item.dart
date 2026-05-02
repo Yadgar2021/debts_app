@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 // ئەو فایلە نوێیەی دروستمان کرد لێرەدا بانگی دەکەین
-import 'package:debts_app/widgets/debt_details_sheet.dart';
+import 'debt_details_sheet.dart';
 
 class DebtListItem extends StatelessWidget {
   final String docId;

@@ -1,13 +1,15 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter/material.dart';
+import 'notification_service.dart';
 // لێرەدا فایلە نوێیەکەمان ناساندووە بە بەرنامەکە
 import 'screens/dashboard_screen.dart';
 
 void main() async {
   // دڵنیابوونەوە لەوەی هەموو شتێک ئامادەیە پێش هەڵبوونی بەرنامەکە
   WidgetsFlutterBinding.ensureInitialized();
-
+  // ئەم دێڕە زیاد بکە بۆ ئیشپێکردنی نۆتیفیکەیشن
+  await NotificationService().init();
   // چالاککردنی فایەربەیس بەپێی ئەو سەکۆیەی بەرنامەکەی لەسەر کاردەکات (ئەندرۆید یان ئای ئۆ ئێس)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 

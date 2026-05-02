@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:debts_app/screens/add_debt_screen.dart';
+import '../screens/add_debt_screen.dart';
 
 class DebtDetailsSheet extends StatelessWidget {
   final String docId;

@@ -1,8 +1,9 @@
-import 'package:debts_app/widgets/gradient_background.dart';
+import '../widgets/gradient_background.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/debt_type_toggle.dart';
 import '../widgets/custom_text_field.dart';
+import '../notification_service.dart'; // 👈 ئەمەمان زیادکرد بۆ نۆتیفیکەیشنەکە
 
 class AddDebtScreen extends StatefulWidget {
   final String? debtId;
@@ -21,6 +22,7 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
   final _noteController = TextEditingController();
   bool _isOwedToMe = true;
   DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedDueDate; // 👈 ئەمە بۆ کاتی گەڕاندنەوەی قەرزەکەیە
   bool _isLoading = false;
   String _selectedCurrency = 'USD';
 
@@ -37,8 +39,14 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
       _noteController.text = widget.existingData!['note'] ?? '';
       _isOwedToMe = widget.existingData!['isOwedToMe'] ?? true;
       _selectedCurrency = widget.existingData!['currency'] ?? 'USD';
+
       if (widget.existingData!['date'] != null) {
         _selectedDate = (widget.existingData!['date'] as Timestamp).toDate();
+      }
+      // 👈 هێنانەوەی کاتی گەڕاندنەوە ئەگەر پێشتر دانرابێت
+      if (widget.existingData!['dueDate'] != null) {
+        _selectedDueDate = (widget.existingData!['dueDate'] as Timestamp)
+            .toDate();
       }
     }
   }
@@ -100,25 +108,61 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
       setState(() => _isLoading = true);
 
       try {
-        final debtData = {
+        final Map<String, dynamic> debtData = {
           'name': _nameController.text.trim(),
           'amount': amountValue,
           'currency': _selectedCurrency,
           'isOwedToMe': _isOwedToMe,
           'date': Timestamp.fromDate(_selectedDate),
           'note': _noteController.text.trim(),
-          'isArchived':
-              false, // 👈 ئەمە زیاد کرا بۆ ئەوەی لە سەرەتادا قەرزەکە ئەرشیف نەکراو بێت
+          'isArchived': false,
         };
+
+        // 👈 مامەڵەکردن لەگەڵ کاتی گەڕاندنەوە
+        if (_selectedDueDate != null) {
+          debtData['dueDate'] = Timestamp.fromDate(_selectedDueDate!);
+        } else if (widget.debtId != null) {
+          // ئەگەر کاتی گەڕاندنەوەکەی سڕییەوە لە کاتی دەستکاریکردندا
+          debtData['dueDate'] = FieldValue.delete();
+        }
+
+        String currentDocId = widget.debtId ?? '';
 
         if (widget.debtId == null) {
           debtData['createdAt'] = FieldValue.serverTimestamp();
-          await FirebaseFirestore.instance.collection('debts').add(debtData);
+          final docRef = await FirebaseFirestore.instance
+              .collection('debts')
+              .add(debtData);
+          currentDocId = docRef.id;
         } else {
           await FirebaseFirestore.instance
               .collection('debts')
               .doc(widget.debtId)
               .update(debtData);
+        }
+
+        // 👈 دانانی نۆتیفیکەیشن بەپێی بەروارەکە
+        if (_selectedDueDate != null) {
+          final scheduleTime = DateTime(
+            _selectedDueDate!.year,
+            _selectedDueDate!.month,
+            _selectedDueDate!.day,
+            9,
+            0, // کاتژمێر ٩ی بەیانی
+          );
+
+          if (scheduleTime.isAfter(DateTime.now())) {
+            await NotificationService().scheduleNotification(
+              id: currentDocId.hashCode,
+              title: _isOwedToMe
+                  ? 'کاتی وەرگرتنەوەی پارە'
+                  : 'کاتی دانەوەی قەرز',
+              body: _isOwedToMe
+                  ? 'کاتی وەرگرتنەوەی قەرزەکەی ${_nameController.text.trim()} هاتووە بە بڕی $amountValue.'
+                  : 'کاتی دانەوەی قەرزەکەی ${_nameController.text.trim()} هاتووە بە بڕی $amountValue.',
+              scheduledDate: scheduleTime,
+            );
+          }
         }
 
         if (mounted) {
@@ -270,11 +314,12 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    // بەرواری وەرگرتنی قەرزەکە
                     InkWell(
                       onTap: () => _selectDate(context),
                       child: InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'بەروار',
+                          labelText: 'بەرواری وەرگرتن/پێدان',
                           prefixIcon: const Icon(Icons.calendar_today),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
@@ -282,6 +327,75 @@ class _AddDebtScreenState extends State<AddDebtScreen> {
                         ),
                         child: Text(
                           "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 👈 ئەمە زیادکرا بۆ دیاریکردنی کاتی گەڕاندنەوە (نۆتیفیکەیشن)
+                    InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              _selectedDueDate ??
+                              DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2100),
+                          helpText: 'کاتی گەڕاندنەوە دیاری بکە',
+                          cancelText: 'پاشگەزبوونەوە',
+                          confirmText: 'هەڵبژاردن',
+                        );
+                        if (picked != null && picked != _selectedDueDate) {
+                          setState(() {
+                            _selectedDueDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(
+                            15,
+                          ), // وەک دیزاینی فۆڕمەکانی تر
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.event_available_rounded,
+                              color: Color(0xFF4A90E2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _selectedDueDate == null
+                                  ? 'کاتی گەڕاندنەوە (ئارەزوومەندانە)'
+                                  : 'گەڕاندنەوە: ${_selectedDueDate!.year}/${_selectedDueDate!.month}/${_selectedDueDate!.day}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: _selectedDueDate == null
+                                    ? Colors.grey.shade700
+                                    : Colors.black87,
+                                fontWeight: _selectedDueDate != null
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (_selectedDueDate != null)
+                              InkWell(
+                                onTap: () =>
+                                    setState(() => _selectedDueDate = null),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
